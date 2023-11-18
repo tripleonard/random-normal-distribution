@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+  </head>
+
+  <body>
+    <h1>Random Normal Distribution</h1>
+    <div>
+      <label for="sampleSize">Enter sample size (n):</label>
+      <input type="number" id="sampleSize" value="10000">
+      <label for="windowSize">Enter window size in minutes (buckets):</label>
+      <input type="number" id="windowSize" value="20">
+      <button onclick="updateCharts()">Update Charts</button>
+    </div>
+    <figure id="figures" class="highcharts-figure">
+    </figure>
+
+    <script>
+      /// normal() returns a random number from the standard normal distribution.
+      /// Uses the Box-Muller transform.
+      const normal = () => Math.sqrt(-2.0 * Math.log(Math.random())) * Math.cos(2.0 * Math.PI * Math.random());
+
+      const normal01 = (sigma = 8) => {
+        while (true) {
+          let num = normal() / (sigma + 0.0) + 0.5; // translate to [0, 1]
+          if (0 <= num && num <= 1) return num; // ok if in range, else resample
+        }
+      }
+
+      const skewnormal = (min, max, skew = 1, sigma = 8) => {
+        var num = normal01(sigma);
+        num = Math.pow(num, skew) // skew
+        num *= max - min // stretch to fill range
+        num += min // offset to min
+        return num;
+      }
+
+      var containerIndex = 0;
+
+      function addFigure({
+        title,
+        n,
+        min,
+        max,
+        increment,
+        fn
+      }) {
+        const round_to_increment = (x, increment) => {
+          return Math.ceil(x / increment) * increment;
+        };
+
+        let data = {};
+        let hc_data = [];
+
+        // Collect n samples
+        for (i = 0; i < n; i += 1) {
+          let rand_num = fn();
+          let key = round_to_increment(rand_num, increment);
+          data[key] = (data[key] || 0) + 1;
+        }
+
+        // Count number of samples at each increment
+        for (let j = min; j < max; j += increment) {
+          let i = round_to_increment(j, increment);
+          hc_data.push({
+            "x": i,
+            "y": data[i] || 0
+          });
+        }
+
+        // Sort
+        hc_data = hc_data.sort(function(a, b) {
+          if (a.x < b.x) return -1;
+          if (a.x > b.x) return 1;
+          return 0;
+        });
+
+        let div = document.createElement("div");
+        div.id = "container" + containerIndex;
+        containerIndex += 1;
+
+        let figures = document.getElementById("figures");
+        figures.appendChild(div);
+        figures.appendChild(document.createElement("br"));
+        figures.appendChild(document.createElement("br"));
+
+        Highcharts.chart(div.id, {
+          title: {
+            text: title
+          },
+          yAxis: {
+            title: {
+              text: 'Count / ' + n
+            }
+          },
+          xAxis: {
+            ordinal: false
+          },
+          legend: {
+            layout: 'vertical',
+            align: 'right',
+            verticalAlign: 'middle'
+          },
+          plotOptions: {},
+          series: [{
+            name: 'Count',
+            data: hc_data
+          }],
+          responsive: {
+            rules: [{
+              condition: {
+                maxWidth: 500
+              },
+              chartOptions: {
+                legend: {
+                  layout: 'horizontal',
+                  align: 'center',
+                  verticalAlign: 'bottom'
+                }
+              }
+            }]
+          }
+        });
+      }
+
+      function updateCharts() {
+        const n = parseInt(document.getElementById("sampleSize").value);
+        const max = parseInt(document.getElementById("windowSize").value);
+        // Remove existing charts
+        const figures = document.getElementById("figures");
+        while (figures.firstChild) {
+          figures.removeChild(figures.firstChild);
+        }
+
+        // Re-generate charts with the new 'n' value
+        addFigure({
+          title: "NORMAL distribution",
+          n: n,
+          min: -1,
+          max: max+1,
+          increment: 1 / 1,
+          fn: () => skewnormal(0, max, 1)
+        });
+
+        addFigure({
+          title: "POISSON distribution",
+          n: n,
+          min: -1,
+          max: max+1,
+          increment: 1 / 1,
+          fn: () => skewnormal(0, max, 2.5)
+        });
+      }
+
+    </script>
+  </body>
+
+</html>
